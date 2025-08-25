@@ -1,8 +1,0 @@
-cd catalog_builder
-git init
-git add .
-git commit -m "Initial commit with image scraper and Pages deploy"
-git branch -M main
-git remote add origin https://github.com/route66guns/ammocsvcervelle.git
-git push -u origin main
-
