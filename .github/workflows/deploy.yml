@@ -20,22 +20,26 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Detect where the project lives (repo root or a catalog_builder subfolder)
       - name: Detect project directory
         id: detect
         shell: bash
         run: |
           set -eux
-          if [ -f "requirements.txt" ] && [ -f "build.py" ]; then
-            echo "WORKDIR=." >> $GITHUB_ENV
-          elif [ -f "catalog_builder/requirements.txt" ] && [ -f "catalog_builder/build.py" ]; then
-            echo "WORKDIR=catalog_builder" >> $GITHUB_ENV
+          for d in . catalog_builder catalog_builder_flat_root; do
+            if [ -f "$d/requirements.txt" ] && [ -f "$d/build.py" ]; then
+              echo "WORKDIR=$d" >> "$GITHUB_ENV"
+              echo "Detected WORKDIR: $d"
+              exit 0
+            fi
+          done
+          CAND=$(find . -maxdepth 3 -type f -name requirements.txt | sed 's|/requirements.txt$||' | head -n1 || true)
+          if [ -n "$CAND" ] && [ -f "$CAND/build.py" ]; then
+            echo "WORKDIR=$CAND" >> "$GITHUB_ENV"
+            echo "Detected WORKDIR via find: $CAND"
           else
             echo "requirements.txt or build.py not found" >&2
-            echo "Repository tree (top):"
-            ls -la
-            echo "Repository tree (full head):"
-            ls -laR | head -n 200
+            echo "Repository tree:"
+            ls -laR | head -n 500
             exit 1
           fi
 
@@ -46,7 +50,7 @@ jobs:
       - name: Show tree
         run: |
           echo "Using WORKDIR=${{ env.WORKDIR }}"
-          ls -la ${{ env.WORKDIR }}
+          ls -la "${{ env.WORKDIR }}"
 
       - name: Cache pip
         uses: actions/cache@v4
@@ -63,7 +67,6 @@ jobs:
           pip install -r requirements.txt
         working-directory: ${{ env.WORKDIR }}
 
-      # Make the scraper non-blocking so a flaky image fetch will not fail the whole build
       - name: Fetch images
         run: |
           python scrape_images.py --limit 120 || echo "Image scraper failed, continuing..."
