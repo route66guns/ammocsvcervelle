@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ title }}</title>
+<style>
+:root{
+  --gap: 1rem;
+  --radius: 16px;
+  --shadow: 0 4px 14px rgba(0,0,0,.08);
+  --muted: #666;
+  --border: #e5e7eb;
+  --bg: #ffffff;
+  --chip: #f3f4f6;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; padding:2rem 1rem; font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
+  line-height:1.4; background:#fafafa; color:#111827;
+}
+.container{max-width:1200px; margin:0 auto;}
+header h1{margin:0 0 .25rem 0; font-size:clamp(1.25rem, 2.5vw, 2rem);}
+header .meta{color:var(--muted); font-size:.875rem; margin-bottom:1rem;}
+.controls{
+  display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:var(--gap); margin:1rem 0 1.25rem;
+}
+.controls > *{background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); padding:.75rem .9rem; box-shadow:var(--shadow);}
+.controls input[type="search"]{width:100%;}
+.controls select, .controls input{font-size:1rem;}
+.grid{
+  display:grid; grid-template-columns:repeat(1, minmax(0,1fr)); gap:var(--gap);
+}
+@media (min-width:640px){ .grid{ grid-template-columns:repeat(2, minmax(0,1fr)); } }
+@media (min-width:1024px){ .grid{ grid-template-columns:repeat(3, minmax(0,1fr)); } }
+.card{
+  background:var(--bg); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); overflow:hidden; display:flex; flex-direction:column;
+}
+.thumb{aspect-ratio:4/3; background:#f9fafb; display:flex; align-items:center; justify-content:center; border-bottom:1px solid var(--border);}
+.thumb img{width:100%; height:100%; object-fit:contain;}
+.content{padding:1rem;}
+.title{font-weight:600; margin:0 0 .25rem 0; font-size:1rem;}
+.meta-row{display:flex; gap:.5rem; flex-wrap:wrap; margin:.35rem 0 .5rem 0;}
+.badge{background:var(--chip); padding:.25rem .5rem; border-radius:999px; font-size:.75rem; color:#111827;}
+.price{font-weight:700; font-size:1.05rem; margin-top:.25rem;}
+.features{margin:.5rem 0 0 0; padding-left:1rem;}
+.features li{margin:.15rem 0; color:#374151;}
+.oos{color:#b91c1c;}
+footer{margin-top:2rem; color:var(--muted); font-size:.875rem;}
+small a{color:inherit;}
+label{font-size:.875rem; color:#374151; display:block; margin-bottom:.25rem;}
+select, input{width:100%;}
+.hidden{display:none !important;}
+</style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>{{ title }}</h1>
+      <div class="meta">
+        {{ total }} products • generated {{ generated_at }}
+        {% if filtered_note %} • <strong>{{ filtered_note }}</strong>{% endif %}
+      </div>
+      <div class="controls">
+        <div>
+          <label for="q">Search</label>
+          <input id="q" type="search" placeholder="Search by title, SKU, or keywords">
+        </div>
+        <div>
+          <label for="cat">Category</label>
+          <select id="cat">
+            <option value="">All categories</option>
+            {% for c in categories %}
+            <option value="{{ c|e }}">{{ c }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="mfg">Manufacturer</label>
+          <select id="mfg">
+            <option value="">All manufacturers</option>
+            {% for m in manufacturers %}
+            <option value="{{ m|e }}">{{ m }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label><input id="inStockOnly" type="checkbox" checked> In-stock only</label>
+        </div>
+      </div>
+    </header>
+
+    <section id="grid" class="grid">
+      {% for p in products %}
+      <article class="card"
+        data-sku="{{ p.sku }}"
+        data-title="{{ p.title|e }}"
+        data-manufacturer="{{ p.manufacturer|e }}"
+        data-category="{{ p.category|e }}"
+        data-keywords="{{ p.keywords|e }}"
+        data-instock="{{ '1' if p.in_stock else '0' }}"
+      >
+        <div class="thumb">
+          <img src="assets/{{ p.sku }}.jpg" alt="{{ p.title|e }} image" onerror="this.replaceWith(makePlaceholder('{{ p.sku|e }}'))">
+        </div>
+        <div class="content">
+          <h3 class="title">{{ p.title }}</h3>
+          <div class="meta-row">
+            {% if p.manufacturer %}<span class="badge">{{ p.manufacturer }}</span>{% endif %}
+            {% if p.category %}<span class="badge">{{ p.category }}</span>{% endif %}
+            {% if p.partno %}<span class="badge">Part # {{ p.partno }}</span>{% endif %}
+            <span class="badge">{{ p.sku }}</span>
+            {% if p.stock_note %}
+              <span class="badge {{ 'oos' if not p.in_stock }}">{{ p.stock_note }}</span>
+            {% endif %}
+          </div>
+          {% if p.price_str %}<div class="price">{{ p.price_str }}</div>{% endif %}
+          {% if p.features %}
+          <ul class="features">
+            {% for f in p.features %}<li>{{ f }}</li>{% endfor %}
+          </ul>
+          {% endif %}
+        </div>
+      </article>
+      {% endfor %}
+    </section>
+
+    <footer>
+      <small>Tip: Paste this entire HTML into a Squarespace Code Block. Missing images will show a neutral placeholder. • SKU-based images load from <code>assets/</code>.</small>
+    </footer>
+  </div>
+
+<script>
+function makePlaceholder(text){
+  const svg = `<svg xmlns='http://www.w3.org/2000/svg' width='600' height='450' viewBox='0 0 600 450' role='img' aria-label='No image'>
+    <rect width='100%' height='100%' fill='#f3f4f6'/>
+    <text x='50%' y='48%' dominant-baseline='middle' text-anchor='middle' fill='#9ca3af' font-size='22' font-family='Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial'>No image</text>
+    <text x='50%' y='58%' dominant-baseline='middle' text-anchor='middle' fill='#d1d5db' font-size='16' font-family='Inter, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial'>SKU ${text}</text>
+  </svg>`;
+  const img = document.createElement('img');
+  img.alt = 'No image';
+  img.src = 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+  return img;
+}
+
+const q = document.getElementById('q');
+const cat = document.getElementById('cat');
+const mfg = document.getElementById('mfg');
+const inStockOnly = document.getElementById('inStockOnly');
+const grid = document.getElementById('grid');
+
+function normalize(s){ return (s || '').toString().toLowerCase(); }
+
+function applyFilters(){
+  const qv = normalize(q.value);
+  const cv = normalize(cat.value);
+  const mv = normalize(mfg.value);
+  const iso = inStockOnly.checked;
+  const cards = grid.children;
+  let visible = 0;
+  for (const card of cards){
+    const title = normalize(card.dataset.title);
+    const sku = normalize(card.dataset.sku);
+    const kw = normalize(card.dataset.keywords);
+    const c = normalize(card.dataset.category);
+    const m = normalize(card.dataset.manufacturer);
+    const instock = card.dataset.instock === '1';
+
+    let ok = true;
+    if (qv) ok = ok && (title.includes(qv) || sku.includes(qv) || kw.includes(qv));
+    if (cv) ok = ok && c === cv;
+    if (mv) ok = ok && m === mv;
+    if (iso) ok = ok && instock;
+    card.classList.toggle('hidden', !ok);
+    if (ok) visible++;
+  }
+}
+
+[q, cat, mfg, inStockOnly].forEach(el => el.addEventListener('input', applyFilters));
+window.addEventListener('DOMContentLoaded', applyFilters);
+</script>
+</body>
+</html>
