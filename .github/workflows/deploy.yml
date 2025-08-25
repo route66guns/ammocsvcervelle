@@ -1,0 +1,95 @@
+name: Build and Deploy Catalog
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Detect where the project lives (repo root or a catalog_builder subfolder)
+      - name: Detect project directory
+        id: detect
+        shell: bash
+        run: |
+          set -eux
+          if [ -f "requirements.txt" ] && [ -f "build.py" ]; then
+            echo "WORKDIR=." >> $GITHUB_ENV
+          elif [ -f "catalog_builder/requirements.txt" ] && [ -f "catalog_builder/build.py" ]; then
+            echo "WORKDIR=catalog_builder" >> $GITHUB_ENV
+          else
+            echo "requirements.txt or build.py not found" >&2
+            echo "Repository tree (top):"
+            ls -la
+            echo "Repository tree (full head):"
+            ls -laR | head -n 200
+            exit 1
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Show tree
+        run: |
+          echo "Using WORKDIR=${{ env.WORKDIR }}"
+          ls -la ${{ env.WORKDIR }}
+
+      - name: Cache pip
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles(format('{0}/requirements.txt', env.WORKDIR)) }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install deps
+        run: |
+          python -V
+          pip install --upgrade pip
+          pip install -r requirements.txt
+        working-directory: ${{ env.WORKDIR }}
+
+      # Make the scraper non-blocking so a flaky image fetch will not fail the whole build
+      - name: Fetch images
+        run: |
+          python scrape_images.py --limit 120 || echo "Image scraper failed, continuing..."
+        working-directory: ${{ env.WORKDIR }}
+
+      - name: Build catalog
+        run: python build.py --title "Route 66 Guns & Ammo Catalog" --min_stock 1
+        working-directory: ${{ env.WORKDIR }}
+
+      - name: Disable Jekyll
+        run: |
+          mkdir -p out
+          touch out/.nojekyll
+        working-directory: ${{ env.WORKDIR }}
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ env.WORKDIR }}/out
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
